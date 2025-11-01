@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 
 import { RiskLevel } from './constants';
 import type { QueryResult } from './types';
+import { checkInputSafety, sanitizeQuery } from './safety';
 
 function createOpenAIClient(): OpenAI {
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -41,35 +42,89 @@ async function loadPromptTemplate(): Promise<string> {
 }
 
 export async function processQuery(question: string, model: string): Promise<QueryResult> {
-  const prompt = await loadPromptTemplate();
-  const client = createOpenAIClient();
- 
-  console.log('Prompt:', prompt);
-  console.log('Question:', question);
-  console.log('Model:', model);
-  console.log('Client:', client);
+  const startTime = Date.now();
 
-  return {
-    metrics: {
-      model,
-      timestamp: new Date().toISOString(),
-      query: question,
-      tokens_prompt: 0,
-      tokens_completion: 0,
-      total_tokens: 0,
-      latency_ms: 0,
-      estimated_cost_usd: 0,
-    },
-    safety: {
-      passed: true,
-      risk_level: RiskLevel.LOW,
-    },
-    response: {
-      answer: 'Hello, world!',
-      confidence: 0.95,
-      actions: ['action1', 'action2'],
-      category: 'category',
-      tags: ['tag1', 'tag2'],
-    },
-  };
+  const safetyCheck = checkInputSafety(question);
+  if (!safetyCheck.passed && safetyCheck.risk_level === RiskLevel.HIGH) {
+    return {
+      response: {
+        answer: 'I cannot process this request due to security concerns.',
+        confidence: 1.0,
+        actions: ['Please rephrase your question', 'Contact support if you need assistance'],
+        category: 'other',
+        tags: ['safety', 'moderation'],
+      },
+      metrics: {
+        timestamp: new Date().toISOString(),
+        query: question.substring(0, 100),
+        tokens_prompt: 0,
+        tokens_completion: 0,
+        total_tokens: 0,
+        latency_ms: Date.now() - startTime,
+        estimated_cost_usd: 0,
+        model: 'safety-filter',
+      },
+      safety: safetyCheck,
+    };
+  }
+
+  const sanitizedQuery = sanitizeQuery(question);
+
+  try {
+    const prompt = await loadPromptTemplate();
+    const client = createOpenAIClient();
+    
+    console.log('Prompt:', prompt);
+    console.log('Question:', sanitizedQuery);
+    console.log('Model:', model);
+    
+    return {
+      metrics: {
+        model,
+        timestamp: new Date().toISOString(),
+        query: question,
+        tokens_prompt: 0,
+        tokens_completion: 0,
+        total_tokens: 0,
+        latency_ms: 0,
+        estimated_cost_usd: 0,
+      },
+      safety: {
+        passed: true,
+        risk_level: RiskLevel.LOW,
+      },
+      response: {
+        answer: 'Hello, world!',
+        confidence: 0.95,
+        actions: ['action1', 'action2'],
+        category: 'category',
+        tags: ['tag1', 'tag2'],
+      },
+    };
+  } catch (error) {
+    const latency = Date.now() - startTime;
+    
+    console.error('Error processing query:', error);
+
+    return {
+      response: {
+        answer: `I encountered an error processing your question: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        confidence: 0.0,
+        actions: ['Please try rephrasing your question', 'Contact support if the issue persists'],
+        category: 'other',
+        tags: ['error'],
+      },
+      metrics: {
+        timestamp: new Date().toISOString(),
+        query: sanitizedQuery.substring(0, 200),
+        tokens_prompt: 0,
+        tokens_completion: 0,
+        total_tokens: 0,
+        latency_ms: latency,
+        estimated_cost_usd: 0,
+        model: 'error',
+      },
+      safety: safetyCheck,
+    };
+  }
 }

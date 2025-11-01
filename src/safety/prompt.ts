@@ -1,5 +1,5 @@
-import { RiskLevel } from './constants';
-import type { SafetyCheck } from './types';
+import { RiskLevel } from '../constants';
+import type { SafetyCheck } from '../types';
 
 const MAX_QUERY_LENGTH = 5000;
 
