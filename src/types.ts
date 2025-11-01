@@ -1,6 +1,4 @@
-/**
- * Type definitions for the customer support helper application
- */
+import { RiskLevel } from "./constants";
 
 export interface SupportResponse {
   answer: string;
@@ -23,7 +21,7 @@ export interface QueryMetrics {
 
 export interface SafetyCheck {
   passed: boolean;
-  risk_level: 'low' | 'medium' | 'high';
+  risk_level: RiskLevel;
   reason?: string;
 }
 
