@@ -1,10 +1,10 @@
 import dotenv from 'dotenv';
 import { serve } from '@hono/node-server';
-import app from './server';
+import app from './api';
 
 dotenv.config();
 
-const port = parseInt(process.env.PORT || '3000', 10);
+const port = Number.parseInt(`${process.env.PORT}`, 10);
 
 console.log(`🚀 Starting server to run on port: ${port}`);
 
@@ -14,4 +14,3 @@ serve({
 }, (info) => {
   console.log(`✅ Server is listening at http://localhost:${info.port}`);
 });
-
