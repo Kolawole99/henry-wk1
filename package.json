@@ -2,12 +2,12 @@
   "name": "llm-integration",
   "version": "1.0.0",
   "description": "Multi-Task Text Utility for customer support agents with structured JSON responses and metrics tracking",
-  "main": "dist/src/run_query.js",
+  "main": "src/index.ts",
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/src/run_query.js",
-    "dev": "tsx src/run_query.ts",
+    "start": "tsx src/index.ts",
+    "dev": "tsx --watch src/index.ts",
     "test": "tsx tests/test_core.ts",
     "clean": "rm -rf dist"
   },
@@ -21,8 +21,10 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "openai": "^4.24.1",
-    "dotenv": "^16.3.1"
+    "@hono/node-server": "^1.19.6",
+    "dotenv": "^16.3.1",
+    "hono": "^4.10.4",
+    "openai": "^4.24.1"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",
