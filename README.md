@@ -1,4 +1,4 @@
-# Customer Support Helper - LLM Integration (Multi Text task Utility)
+# Customer Support Helper - LLM Integration
 
 A TypeScript-based customer support assistant that processes natural language questions and returns structured JSON responses with confidence scores, recommended actions, and metrics tracking.
 
@@ -15,7 +15,7 @@ A TypeScript-based customer support assistant that processes natural language qu
 
 ### Prerequisites
 
-- Node.js 22 
+- Node.js 22
 - pnpm
 - OpenRouter API key or OpenAI API key
 
@@ -24,7 +24,7 @@ A TypeScript-based customer support assistant that processes natural language qu
 1. Clone the repository:
 ```bash
 git clone git@github.com:Kolawole99/henry-wk1.git
-cd llm-integration
+cd henry-wk1
 ```
 
 2. Install dependencies:
@@ -47,14 +47,10 @@ OPENAI_API_KEY=your_openai_key_here
 DEFAULT_MODEL=gpt-3.5-turbo
 OPENROUTER_REFERER_URL=https://your-app.com
 OPENROUTER_APP_NAME=Customer Support Helper
+PORT=3000
 ```
 
-### Usage
-
-#### Run as API Server (Recommended)
-
-Start the Hono API server:
-
+4. Start the server:
 ```bash
 # Production mode
 pnpm start
@@ -65,12 +61,16 @@ pnpm run dev
 
 The server will start on `http://localhost:3000` (or the port specified in the `PORT` environment variable).
 
-**API Endpoints:**
+## Usage
+
+### API Endpoints
 
 - `GET /` - Health check and API info
-- `POST /completions` - Submit a prompt query
+- `POST /completions` - Submit a query
 
-**Example API Request:**
+### Example Requests
+
+**Successful Query:**
 
 ```bash
 curl -X POST http://localhost:3000/completions \
@@ -81,8 +81,7 @@ curl -X POST http://localhost:3000/completions \
   }'
 ```
 
-**Example Response 1:**
-
+**Response:**
 ```json
 {
   "response": {
@@ -113,7 +112,7 @@ curl -X POST http://localhost:3000/completions \
 }
 ```
 
-**Example API Request 1:**
+**Blocked Query (Safety Check Failed):**
 
 ```bash
 curl -X POST http://localhost:3000/completions \
@@ -124,10 +123,19 @@ curl -X POST http://localhost:3000/completions \
   }'
 ```
 
-**Example Response 2:**
-
+**Response:**
 ```json
 {
+  "response": {
+    "answer": "I cannot process this request due to security concerns.",
+    "confidence": 1,
+    "actions": [
+      "Please rephrase your question",
+      "Contact support if you need assistance"
+    ],
+    "category": "other",
+    "tags": ["safety", "moderation"]
+  },
   "metrics": {
     "model": "gpt-3.5-turbo",
     "timestamp": "2025-11-01T13:54:31.795Z",
@@ -143,128 +151,11 @@ curl -X POST http://localhost:3000/completions \
     "passed": false,
     "risk_level": "High",
     "reason": "Detected prompt injection pattern"
-  },
-  "response": {
-    "answer": "I cannot process this request due to security concerns.",
-    "confidence": 1,
-    "actions": [
-      "Please rephrase your question",
-      "Contact support if you need assistance"
-    ],
-    "category": "other",
-    "tags": [
-      "safety",
-      "moderation"
-    ]
   }
 }
 ```
 
-#### Run Tests
-
-```bash
-npm test
-```
-
-## Project Structure
-
-```
-llm-integration/
-├── src/
-│   ├── index.ts          # API server entry point
-│   ├── api.ts            # Hono API server routes
-│   ├── run_query.ts      # Main query handler
-│   ├── safety/           # Safety/moderation module
-│   │   ├── index.ts      # Safety module exports
-│   │   ├── prompt.ts     # Input safety checks
-│   │   └── response.ts   # Response parsing and validation
-│   ├── logging/          # Logging module
-│   │   ├── index.ts      # Central logging function (logQueryData)
-│   │   ├── metrics.ts    # Metrics logging functions
-│   │   └── safety.ts     # Safety check logging functions
-│   ├── metrics.ts        # Cost calculation utilities
-│   ├── types.ts          # TypeScript type definitions
-│   └── constants.ts      # Application constants
-├── prompts/
-│   └── main_prompt.md    # Instruction-based prompt template
-├── tests/
-│   ├── test_core.ts      # Test suite
-│   └── test-utils.ts     # Test utilities
-├── metrics/
-│   └── metrics.json      # Logged metrics (auto-generated)
-├── reports/
-│   ├── safety-reports/   # Safety check logs (auto-generated)
-│   │   └── safety-checks.json
-│   └── PI_report_en.md  # Project report
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## Logging and Monitoring
-
-The application uses a unified logging system that tracks both metrics and safety checks for every query.
-
-### Metrics Logging
-
-Metrics are automatically logged to `metrics/metrics.json` after each query. The file contains an array of all query metrics with the following fields:
-
-- `timestamp`: ISO 8601 timestamp
-- `query`: User's question (truncated)
-- `tokens_prompt`: Input tokens
-- `tokens_completion`: Output tokens
-- `total_tokens`: Total tokens used
-- `latency_ms`: Processing time in milliseconds
-- `estimated_cost_usd`: Calculated cost
-- `model`: Model identifier
-
-### Safety Check Logging
-
-Safety checks are automatically logged to `reports/safety-reports/safety-checks.json` for every query. Each entry includes:
-
-- `timestamp`: ISO 8601 timestamp
-- `query`: User's question (truncated to 500 characters)
-- `safety`: Safety check result with risk level and reason
-- `model`: Model identifier (if available)
-
-### Unified Logging Function
-
-The `logQueryData()` function in `src/logging/index.ts` is the central logging function that logs both metrics and safety checks in parallel, ensuring all query data is consistently tracked. Individual logging functions (`logMetrics` and `logSafetyChecks`) are also available if needed.
-
-### View Logs
-
-```bash
-# View metrics
-cat metrics/metrics.json | jq
-
-# View safety checks
-cat reports/safety-reports/safety-checks.json | jq
-```
-
-## Safety Features
-
-The system includes safety checks to prevent adversarial inputs:
-
-- **Pattern Detection**: Identifies prompt injection attempts
-- **Length Validation**: Blocks extremely long queries (DoS prevention)
-- **Keyword Filtering**: Detects high-risk phrases
-- **Input Sanitization**: Removes control characters
-
-Blocked queries return a safe response without calling the API.
-
-## Testing
-
-Run the test suite:
-
-```bash
-npm test
-```
-
-Tests cover:
-- JSON schema validation
-- Safety checks
-- Cost calculation
-- Response parsing
+Note: The API returns `200 OK` even for flagged requests, as it still provides metrics and safety information.
 
 ## Configuration
 
@@ -289,15 +180,137 @@ Supported models:
 - `gpt-4-turbo` (balanced)
 - Any model supported by OpenRouter
 
+## Safety Features
+
+The system includes automated safety checks to prevent adversarial inputs:
+
+- **Pattern Detection**: Identifies prompt injection attempts
+- **Length Validation**: Blocks extremely long queries (DoS prevention)
+- **Keyword Filtering**: Detects high-risk phrases
+- **Input Sanitization**: Removes control characters
+
+Blocked queries return a safe response without calling the LLM API, saving costs and preventing misuse. Safety checks are logged for monitoring and analysis.
+
+## Logging and Monitoring
+
+The application uses a unified logging system that automatically tracks metrics and safety checks for every query.
+
+### Metrics Logging
+
+Metrics are logged to `metrics/metrics.json` after each query, including:
+- `timestamp`: ISO 8601 timestamp
+- `query`: User's question (truncated)
+- `tokens_prompt`: Input tokens
+- `tokens_completion`: Output tokens
+- `total_tokens`: Total tokens used
+- `latency_ms`: Processing time in milliseconds
+- `estimated_cost_usd`: Calculated cost
+- `model`: Model identifier
+
+### Safety Check Logging
+
+Safety checks are logged to `reports/safety-reports/safety-checks.json`, including:
+- `timestamp`: ISO 8601 timestamp
+- `query`: User's question (truncated to 500 characters)
+- `safety`: Safety check result with risk level and reason
+- `model`: Model identifier (if available)
+
+### Viewing Logs
+
+```bash
+# View metrics
+cat metrics/metrics.json | jq
+
+# View safety checks
+cat reports/safety-reports/safety-checks.json | jq
+```
+
+The `logQueryData()` function in `src/logging/index.ts` handles both metrics and safety logging in parallel. Individual functions (`logMetrics` and `logSafetyChecks`) are also available if needed.
+
+## Project Structure
+
+```
+llm-integration/
+├── src/
+│   ├── index.ts          # API server entry point
+│   ├── api.ts            # Hono API server routes
+│   ├── run_query.ts      # Main query handler
+│   ├── safety/           # Safety/moderation module
+│   │   ├── index.ts      # Safety module exports
+│   │   ├── prompt.ts     # Input safety checks
+│   │   └── response.ts   # Response parsing and validation
+│   ├── logging/          # Logging module
+│   │   ├── index.ts      # Central logging function (logQueryData)
+│   │   ├── metrics.ts    # Metrics logging functions
+│   │   └── safety.ts     # Safety check logging functions
+│   ├── metrics.ts        # Cost calculation utilities
+│   ├── types.ts          # TypeScript type definitions
+│   └── constants.ts      # Application constants
+├── prompts/
+│   └── main_prompt.md    # Instruction-based prompt template
+├── tests/
+│   └── test_core.ts      # Test suite
+├── metrics/
+│   └── metrics.json      # Logged metrics (auto-generated)
+├── reports/
+│   ├── safety-reports/   # Safety check logs (auto-generated)
+│   │   └── safety-checks.json
+│   └── PI_report_en.md  # Project report
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+## Development
+
+### Build
+
+```bash
+pnpm run build
+```
+
+### Development Mode
+
+```bash
+# API server mode with hot reload
+pnpm run dev
+```
+
+### Clean Build Artifacts
+
+```bash
+pnpm run clean
+```
+
+## Testing
+
+Run the test suite:
+
+```bash
+pnpm test
+```
+
+Tests cover:
+- JSON schema validation
+- Safety checks
+- Cost calculation
+- Response parsing
+
 ## Prompt Engineering
 
-The system uses an **instruction-based template** with:
-- Clear role definition (customer support assistant)
-- Explicit JSON schema
-- Few-shot examples
-- Format constraints and guidelines
+The system uses an **instruction-based template** approach for reliable structured output. See `prompts/main_prompt.md` for the full template.
 
-See `prompts/main_prompt.md` for details.
+**Key Features:**
+- Clear role definition (customer support assistant)
+- Explicit JSON schema with examples
+- Few-shot examples for format guidance
+- Format constraints and quality guidelines
+
+**Why This Approach:**
+- **Reliability**: Instruction-based prompts with schema reduce hallucinations and improve consistency
+- **Downstream compatibility**: Strict JSON format ensures integration with other systems
+- **Quality control**: Confidence scores and categorization enable better filtering and routing
+- **Few-shot learning**: Examples help the model understand expected format without fine-tuning
 
 ## Known Limitations
 
@@ -305,27 +318,7 @@ See `prompts/main_prompt.md` for details.
 2. **No Conversation Context**: Each query is processed independently
 3. **Cost Estimation**: Pricing is approximate and may vary by provider
 4. **Language Support**: Optimized for English (other languages may work but not optimized)
-
-## Development
-
-### Build
-
-```bash
-npm run build
-```
-
-### Development Mode
-
-```bash
-# API server mode with hot reload
-npm run dev
-```
-
-### Clean Build Artifacts
-
-```bash
-npm run clean
-```
+5. **Error Responses**: Returns 200 even for flagged requests to provide metrics and safety information
 
 ## Troubleshooting
 
@@ -335,7 +328,7 @@ npm run clean
 
 ### Error: "Failed to parse JSON response"
 - The LLM may have returned invalid JSON
-- Check the model being used (try `gpt-4` for better structured output)
+- Try `gpt-4` for better structured output
 - Review the prompt template in `prompts/main_prompt.md`
 
 ### High Costs
@@ -361,21 +354,4 @@ For issues or questions, please open a GitHub issue.
 
 ---
 
-**Built with**: TypeScript, OpenAI SDK, OpenRouter
-
----
-
-**Prompt Engineering Technique: Instruction-Based Template**
-
-This prompt uses an instruction-based approach with:
-1. **Clear role definition**: Establishes the AI's purpose as a customer support assistant
-2. **Explicit schema**: JSON structure is defined with examples to ensure structured output
-3. **Few-shot example**: Provides a concrete example to guide response format
-4. **Constraints and guidelines**: Sets boundaries for response quality (confidence ranges, category limits)
-5. **Format enforcement**: Emphasizes JSON-only output with no additional text
-
-This technique was chosen because:
-- **Reliability**: Instruction-based prompts with schema reduce hallucinations and improve consistency
-- **Downstream compatibility**: Strict JSON format ensures integration with other systems
-- **Quality control**: Confidence scores and categorization enable better filtering and routing
-- **Few-shot learning**: Examples help the model understand expected format and style without extensive fine-tuning
+**Built with**: TypeScript, OpenAI SDK, OpenRouter, Hono
