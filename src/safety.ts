@@ -83,7 +83,7 @@ export function checkInputSafety(query: string): SafetyCheck {
   for (const keyword of MEDIUM_RISK_KEYWORDS) {
     if (lowerQuery.includes(keyword)) {
       return {
-        passed: true, // Still allow but flag
+        passed: true,
         risk_level: RiskLevel.MEDIUM,
         reason: `Contains medium-risk keyword: ${keyword}`,
       };
