@@ -2,10 +2,10 @@ import path from 'path';
 import OpenAI from 'openai';
 import { promises as fs } from 'fs';
 import { fileURLToPath } from 'url';
-
 import { RiskLevel } from './constants';
-import type { QueryResult } from './types';
-import { checkInputSafety, sanitizeQuery } from './safety';
+import { calculateCost, logMetrics } from './metrics';
+import type { QueryMetrics, QueryResult } from './types';
+import { checkInputSafety, parseJSONResponse, sanitizeQuery, validateResponse } from './safety';
 
 function createOpenAIClient(): OpenAI {
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -46,7 +46,21 @@ export async function processQuery(question: string, model: string): Promise<Que
 
   const safetyCheck = checkInputSafety(question);
   if (!safetyCheck.passed && safetyCheck.risk_level === RiskLevel.HIGH) {
+    const metrics: QueryMetrics = {
+      model,
+      timestamp: new Date().toISOString(),
+      query: question.substring(0, 100),
+      tokens_prompt: 0,
+      tokens_completion: 0,
+      total_tokens: 0,
+      latency_ms: Date.now() - startTime,
+      estimated_cost_usd: 0,
+    };
+    await logMetrics(metrics);
+
     return {
+      metrics,
+      safety: safetyCheck,
       response: {
         answer: 'I cannot process this request due to security concerns.',
         confidence: 1.0,
@@ -54,59 +68,70 @@ export async function processQuery(question: string, model: string): Promise<Que
         category: 'other',
         tags: ['safety', 'moderation'],
       },
-      metrics: {
-        timestamp: new Date().toISOString(),
-        query: question.substring(0, 100),
-        tokens_prompt: 0,
-        tokens_completion: 0,
-        total_tokens: 0,
-        latency_ms: Date.now() - startTime,
-        estimated_cost_usd: 0,
-        model: 'safety-filter',
-      },
-      safety: safetyCheck,
     };
   }
 
   const sanitizedQuery = sanitizeQuery(question);
 
   try {
-    const prompt = await loadPromptTemplate();
     const client = createOpenAIClient();
+    const systemPrompt = await loadPromptTemplate();
     
-    console.log('Prompt:', prompt);
-    console.log('Question:', sanitizedQuery);
-    console.log('Model:', model);
-    
+    const completionResponse = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: sanitizedQuery },
+      ],
+      temperature: 0.3,
+      response_format: { type: 'json_object' },
+    });
+    const responseText = completionResponse.choices[0]?.message?.content || '{}';
+    const latency = Date.now() - startTime;
+
+    const response = parseJSONResponse(responseText);
+    validateResponse(response);
+
+    const tokens = completionResponse.usage;
+    if (!tokens) {
+      throw new Error('No tokens found in completion response');
+    }
+
+    const metrics: QueryMetrics = {
+      timestamp: new Date().toISOString(),
+      query: sanitizedQuery.substring(0, 200),
+      tokens_prompt: tokens.prompt_tokens,
+      tokens_completion: tokens.completion_tokens,
+      total_tokens: tokens.total_tokens,
+      latency_ms: latency,
+      estimated_cost_usd: calculateCost(model, tokens.prompt_tokens, tokens.completion_tokens),
+      model,
+    };
+    await logMetrics(metrics);
+
     return {
-      metrics: {
-        model,
-        timestamp: new Date().toISOString(),
-        query: question,
-        tokens_prompt: 0,
-        tokens_completion: 0,
-        total_tokens: 0,
-        latency_ms: 0,
-        estimated_cost_usd: 0,
-      },
-      safety: {
-        passed: true,
-        risk_level: RiskLevel.LOW,
-      },
-      response: {
-        answer: 'Hello, world!',
-        confidence: 0.95,
-        actions: ['action1', 'action2'],
-        category: 'category',
-        tags: ['tag1', 'tag2'],
-      },
+      response,
+      metrics,
+      safety: safetyCheck,
     };
   } catch (error) {
-    const latency = Date.now() - startTime;
-    
+    const metrics: QueryMetrics = {
+      model,
+      timestamp: new Date().toISOString(),
+      query: sanitizedQuery.substring(0, 200),
+      latency_ms: Date.now() - startTime,
+      tokens_prompt: 0,
+      tokens_completion: 0,
+      total_tokens: 0,
+      estimated_cost_usd: 0,
+    };
+    await logMetrics(metrics);
+
     console.error('Error processing query:', error);
 
     return {
+      metrics,
+      safety: safetyCheck,
       response: {
         answer: `I encountered an error processing your question: ${error instanceof Error ? error.message : 'Unknown error'}`,
         confidence: 0.0,
@@ -114,17 +139,6 @@ export async function processQuery(question: string, model: string): Promise<Que
         category: 'other',
         tags: ['error'],
       },
-      metrics: {
-        timestamp: new Date().toISOString(),
-        query: sanitizedQuery.substring(0, 200),
-        tokens_prompt: 0,
-        tokens_completion: 0,
-        total_tokens: 0,
-        latency_ms: latency,
-        estimated_cost_usd: 0,
-        model: 'error',
-      },
-      safety: safetyCheck,
     };
   }
 }

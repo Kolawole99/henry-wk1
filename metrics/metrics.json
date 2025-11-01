@@ -1,0 +1,12 @@
+[
+  {
+    "timestamp": "2025-11-01T13:29:46.212Z",
+    "query": "How do I reset my password?",
+    "tokens_prompt": 569,
+    "tokens_completion": 100,
+    "total_tokens": 669,
+    "latency_ms": 2684,
+    "estimated_cost_usd": 0.0004345,
+    "model": "gpt-3.5-turbo"
+  }
+]
