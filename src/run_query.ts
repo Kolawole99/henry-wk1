@@ -3,7 +3,8 @@ import OpenAI from 'openai';
 import { promises as fs } from 'fs';
 import { fileURLToPath } from 'url';
 import { RiskLevel } from './constants';
-import { calculateCost, logMetrics } from './metrics';
+import { logQueryData } from './logging';
+import { calculateCost } from './metrics';
 import type { QueryMetrics, QueryResult } from './types';
 import { checkInputSafety, parseJSONResponse, sanitizeQuery, validateResponse } from './safety';
 
@@ -41,7 +42,7 @@ async function loadPromptTemplate(): Promise<string> {
   }
 }
 
-export async function processQuery(question: string, model: string): Promise<QueryResult> {
+export async function processQuery(question: string, model: string, requestId?: string): Promise<QueryResult> {
   const startTime = Date.now();
 
   const safetyCheck = checkInputSafety(question);
@@ -55,8 +56,9 @@ export async function processQuery(question: string, model: string): Promise<Que
       total_tokens: 0,
       latency_ms: Date.now() - startTime,
       estimated_cost_usd: 0,
+      request_id: requestId,
     };
-    await logMetrics(metrics);
+    await logQueryData(metrics, question, safetyCheck, requestId);
 
     return {
       metrics,
@@ -106,8 +108,9 @@ export async function processQuery(question: string, model: string): Promise<Que
       latency_ms: latency,
       estimated_cost_usd: calculateCost(model, tokens.prompt_tokens, tokens.completion_tokens),
       model,
+      request_id: requestId,
     };
-    await logMetrics(metrics);
+    await logQueryData(metrics, question, safetyCheck, requestId);
 
     return {
       response,
@@ -124,8 +127,9 @@ export async function processQuery(question: string, model: string): Promise<Que
       tokens_completion: 0,
       total_tokens: 0,
       estimated_cost_usd: 0,
+      request_id: requestId,
     };
-    await logMetrics(metrics);
+    await logQueryData(metrics, question, safetyCheck, requestId);
 
     console.error('Error processing query:', error);
 

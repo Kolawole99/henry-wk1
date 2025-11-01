@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { requestId } from 'hono/request-id';
 import { processQuery } from './run_query';
 
 const app = new Hono();
 
 app.use('/*', cors());
+app.use('/*', requestId());
 
 app.get('/', (c) => {
   return c.json(
@@ -21,6 +23,7 @@ app.get('/', (c) => {
 app.post('/completions', async (c) => {
   try {
     const body = await c.req.json();
+    const requestId = c.get('requestId');
     const { question, model } = body;
 
     if (!question || typeof question !== 'string' || question.trim().length === 0) {
@@ -44,7 +47,7 @@ app.post('/completions', async (c) => {
       );
     }
 
-    const result = await processQuery(question, modelToUse);
+    const result = await processQuery(question, modelToUse, requestId);
 
     return c.json(result, 200);
   } catch (error) {

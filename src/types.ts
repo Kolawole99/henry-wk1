@@ -17,6 +17,7 @@ export interface QueryMetrics {
   tokens_completion: number;
   total_tokens: number;
   estimated_cost_usd: number;
+  request_id?: string;
 }
 
 export interface SafetyCheck {
